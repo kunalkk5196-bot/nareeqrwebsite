@@ -122,6 +122,7 @@ export default function MachinesPage() {
         razorpayIdentifier: '',
         simNumber: '',
         simOperator: '',
+        businessMobileNumber: '',
         imei: '',
       });
     } catch (err: any) {
