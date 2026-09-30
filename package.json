@@ -1,0 +1,17 @@
+{
+  "name": "naree-vendtrack-system",
+  "version": "1.0.0",
+  "description": "Sanitary Napkin Vending Machine IoT Management Platform",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "simulate:iot": "tsx iot/simulator.ts",
+    "test": "cd backend && npm test",
+    "docker:up": "cd docker && docker compose up -d",
+    "docker:down": "cd docker && docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

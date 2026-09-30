@@ -1,0 +1,386 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoleType {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum MachineStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+  DEACTIVATED
+}
+
+enum PaymentGateway {
+  PHONEPE
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+  UNKNOWN
+}
+
+enum DispenseStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  JAMMED
+  TIMEOUT
+}
+
+enum StockEventType {
+  STOCK_INITIALIZED
+  STOCK_REFILLED
+  PAD_DISPENSED
+  MANUAL_ADJUSTMENT
+  STOCK_CORRECTION
+  OUT_OF_STOCK
+  LOW_STOCK
+  STOCK_MISMATCH
+}
+
+enum EventSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum NotificationType {
+  LOW_STOCK
+  OUT_OF_STOCK
+  MACHINE_OFFLINE
+  PAYMENT_FAILURE_SPIKE
+  DISPENSE_FAILURE
+  MACHINE_ERROR
+  UNUSUAL_ACTIVITY
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         RoleType   @default(OPERATOR)
+  isActive     Boolean    @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Machine {
+  id                 String                @id @default(uuid())
+  machineId          String                @unique // e.g. VM-PUN-0001
+  machineCode        String?
+  machineName        String
+  location           String
+  address            String?
+  city               String
+  state              String
+  latitude           Float?
+  longitude          Float?
+  installationDate   DateTime              @default(now())
+  iotDeviceId        String                @unique // Hardware identifier
+  simNumber          String?
+  imei               String?
+  deviceTokenHash    String?
+  productCapacity    Int                   @default(100)
+  currentStock       Int                   @default(0)
+  lowStockThreshold  Int                   @default(20)
+  status             MachineStatus         @default(OFFLINE)
+  lastSeen           DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  payments           Payment[]
+  dispenses          DispenseTransaction[]
+  stockTransactions  StockTransaction[]
+  heartbeats         MachineHeartbeat[]
+  events             MachineEvent[]
+  qrIdentifiers      QrIdentifier[]
+  qrActivities       QrActivity[]
+  notifications      Notification[]
+  machineProducts    MachineProduct[]
+
+  @@index([status])
+  @@index([city])
+  @@index([iotDeviceId])
+  @@map("machines")
+}
+
+model Product {
+  id              String                @id @default(uuid())
+  productId       String                @unique // e.g. PAD-001
+  name            String
+  description     String?
+  price           Float                 // Price in INR (e.g. 10.00)
+  sku             String                @unique
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  machineProducts MachineProduct[]
+  payments        Payment[]
+  dispenses       DispenseTransaction[]
+  stockTxns       StockTransaction[]
+
+  @@map("products")
+}
+
+model MachineProduct {
+  id            String   @id @default(uuid())
+  machineId     String
+  productId     String
+  slotNumber    Int      @default(1)
+  priceOverride Float?
+  isAvailable   Boolean  @default(true)
+
+  machine       Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, productId, slotNumber])
+  @@map("machine_products")
+}
+
+model QrIdentifier {
+  id          String         @id @default(uuid())
+  machineId   String
+  gateway     PaymentGateway
+  identifier  String         // e.g. PHONEPE-VM-PUN-0001, RAZORPAY-VM-PUN-0001
+  merchantId  String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  machine     Machine        @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([gateway, identifier])
+  @@index([identifier])
+  @@map("qr_identifiers")
+}
+
+model Payment {
+  id                   String           @id @default(uuid())
+  transactionId        String           @unique // System Transaction ID e.g. TXN-20260922-0001
+  machineId            String
+  gateway              PaymentGateway
+  amount               Float            // in INR
+  currency             String           @default("INR")
+  status               PaymentStatus    @default(PENDING)
+  providerTxnId        String?          // Gateway payment ID
+  productId            String?
+  quantity             Int              @default(1)
+  failureReason        String?
+  referenceId          String?          // Order ID or merchant ref
+  webhookStatus        String?
+  verifiedAt           DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  machine              Machine          @relation(fields: [machineId], references: [id])
+  product              Product?         @relation(fields: [productId], references: [id])
+  dispenseTransaction  DispenseTransaction?
+  webhooks             PaymentWebhook[]
+
+  @@index([machineId])
+  @@index([status])
+  @@index([gateway])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model PaymentWebhook {
+  id             String         @id @default(uuid())
+  paymentId      String?
+  gateway        PaymentGateway
+  eventType      String
+  payload        String         // JSON payload string
+  signature      String?
+  isValid        Boolean        @default(false)
+  idempotencyKey String         @unique
+  processedAt    DateTime?
+  errorMessage   String?
+  createdAt      DateTime       @default(now())
+
+  payment        Payment?       @relation(fields: [paymentId], references: [id])
+
+  @@index([gateway])
+  @@index([idempotencyKey])
+  @@map("payment_webhooks")
+}
+
+model DispenseTransaction {
+  id                 String         @id @default(uuid())
+  dispenseId         String         @unique // e.g. DISP-20260922-0001
+  machineId          String
+  productId          String
+  quantity           Int            @default(1)
+  paymentId          String?        @unique // 1-to-1 relationship with Payment (nullable for manual/coin/test dispenses)
+  status             DispenseStatus @default(PENDING)
+  failureReason      String?
+  deviceConfirmation String?
+  motorIndex         Int            @default(1)
+  dispensedAt        DateTime?
+  createdAt          DateTime       @default(now())
+
+  machine            Machine        @relation(fields: [machineId], references: [id])
+  product            Product        @relation(fields: [productId], references: [id])
+  payment            Payment?       @relation(fields: [paymentId], references: [id])
+  stockTransactions  StockTransaction[]
+
+  @@index([machineId])
+  @@index([status])
+  @@index([dispensedAt])
+  @@map("dispense_transactions")
+}
+
+model StockTransaction {
+  id             String          @id @default(uuid())
+  machineId      String
+  productId      String
+  eventType      StockEventType
+  previousStock  Int
+  changeQuantity Int             // positive for refills, negative for dispenses
+  newStock       Int
+  reason         String?
+  performedBy    String?         // User ID or SYSTEM
+  dispenseId     String?
+  createdAt      DateTime        @default(now())
+
+  machine        Machine         @relation(fields: [machineId], references: [id])
+  product        Product         @relation(fields: [productId], references: [id])
+  dispense       DispenseTransaction? @relation(fields: [dispenseId], references: [id])
+
+  @@index([machineId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("stock_transactions")
+}
+
+model MachineHeartbeat {
+  id              String         @id @default(uuid())
+  machineId       String
+  deviceId        String
+  status          MachineStatus  @default(ONLINE)
+  reportedStock   Int?
+  signalStrength  Int?           // RSSI (0 - 100 or dBm)
+  batteryLevel    Float?
+  voltage         Float?
+  temperature     Float?
+  motorStatus     String?        // OK, FAULT, JAMMED
+  sensorStatus    String?        // OK, BLOCKED, CALIBRATING
+  errorCodes      String?
+  ipAddress       String?
+  receivedAt      DateTime       @default(now())
+
+  machine         Machine        @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([machineId])
+  @@index([receivedAt])
+  @@map("machine_heartbeats")
+}
+
+model MachineEvent {
+  id          String        @id @default(uuid())
+  machineId   String
+  eventType   String        // OFFLINE_DETECTED, MOTOR_JAM, SENSOR_FAULT, etc.
+  severity    EventSeverity @default(INFO)
+  details     String?
+  isResolved  Boolean       @default(false)
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+
+  machine     Machine       @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([machineId])
+  @@index([severity])
+  @@index([isResolved])
+  @@map("machine_events")
+}
+
+model QrActivity {
+  id            String         @id @default(uuid())
+  machineId     String
+  gateway       PaymentGateway
+  scanCount     Int?           // null if not provided by provider
+  scanTimestamp DateTime?
+  source        String?        // "MERCHANT_API", "WEBHOOK", "SDK"
+  rawEventData  String?
+  createdAt     DateTime       @default(now())
+
+  machine       Machine        @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([machineId])
+  @@index([gateway])
+  @@index([createdAt])
+  @@map("qr_activity")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  severity  EventSeverity    @default(INFO)
+  title     String
+  message   String
+  machineId String?
+  metadata  String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  machine   Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
+
+  @@index([isRead])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // e.g. "MACHINE_CREATED", "STOCK_RECONCILED", "ADMIN_LOGIN"
+  entity    String   // e.g. "Machine", "Payment", "Stock"
+  entityId  String?
+  ipAddress String?
+  userAgent String?
+  oldValues String?  // JSON
+  newValues String?  // JSON
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}
