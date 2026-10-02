@@ -1,4 +1,4 @@
-// File: D:\cpp\naree qr website\frontend\src\app\audit-logs\page.tsx
+// File: D:\cpp\naree qr website\src\app\audit-logs\page.tsx
 import * as entry from '../../../../src/app/audit-logs/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
