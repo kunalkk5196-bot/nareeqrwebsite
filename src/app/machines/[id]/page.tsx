@@ -51,11 +51,7 @@ export default function MachineDetailsPage() {
 
   const handleSimulate = async (gateway: string) => {
     try {
-      await fetch(`http://localhost:5000/api/v1/payments/simulate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ machineId, gateway, status: 'SUCCESS', amount: 10 }),
-      });
+      await api.simulatePayment({ machineId, gateway, status: 'SUCCESS', amount: 10 });
       alert(`${gateway} Payment Simulation Triggered! Refreshing details...`);
       fetchMachineDetails();
     } catch (err) {
