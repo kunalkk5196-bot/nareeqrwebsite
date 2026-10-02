@@ -204,3 +204,53 @@ Test Suites:
 - `/users`: RBAC administrator and operator management.
 - `/audit-logs`: Immutable system activity trail.
 - `/settings`: Configuration of offline heartbeat timeouts, thresholds, and operational mode toggles.
+
+---
+
+## 11. MOCK_MODE vs. Production PostgreSQL
+
+### Local Development / Demo Mode (`MOCK_MODE=true`)
+When `MOCK_MODE=true` (or when running without a running PostgreSQL container):
+- The platform boots an in-memory relational DataStore initialized with **10 seed machines** (spread across Pune & Mumbai), 2 sanitary napkin products, and historical baseline transactions.
+- A prominent amber **`DEMO / MOCK MODE`** banner is displayed in the frontend header.
+- All CRUD actions, QR transactions, and telemetry simulations operate immediately without external service dependencies.
+
+### Production PostgreSQL Mode (`MOCK_MODE=false`)
+For production deployment with a real PostgreSQL database:
+1. Set `MOCK_MODE=false` in your environment.
+2. Provide a PostgreSQL connection string:
+   ```bash
+   DATABASE_URL="postgresql://user:password@hostname:5432/naree_vending?schema=public"
+   ```
+3. Run Prisma database migrations to apply all 17 normalized tables:
+   ```bash
+   cd backend
+   npx prisma migrate deploy
+   # or
+   npm run prisma:push
+   ```
+4. Seed the database with initial users, products, machines, and QR mappings:
+   ```bash
+   npm run seed
+   ```
+
+---
+
+## 12. Deployment Guide
+
+### Vercel Deployment
+The repository is pre-configured with `vercel.json` for multi-service or serverless deployment:
+1. Connect your repository to Vercel.
+2. Configure Environment Variables:
+   - `NEXT_PUBLIC_MOCK_MODE` (`true` for demo, `false` for live)
+   - `NEXT_PUBLIC_API_URL` (URL of your backend API)
+   - `DATABASE_URL` (PostgreSQL connection string)
+   - `JWT_SECRET` (A strong, random 256-bit key)
+3. Deploy directly via the Vercel Dashboard or `vercel deploy`.
+
+### Docker Deployment
+```bash
+docker compose up -d
+```
+Starts PostgreSQL, Mosquitto MQTT broker, backend API container on port 5000, and Next.js frontend on port 3000.
+

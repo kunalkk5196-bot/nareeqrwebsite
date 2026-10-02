@@ -100,6 +100,8 @@ model Machine {
   installationDate   DateTime              @default(now())
   iotDeviceId        String                @unique // Hardware identifier
   simNumber          String?
+  simOperator        String?
+  businessMobileNumber String?
   imei               String?
   deviceTokenHash    String?
   productCapacity    Int                   @default(100)

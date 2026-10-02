@@ -2,7 +2,7 @@
 node_modules/
 /.pnpm-store
 
-# Environment variables
+# Environment variables — NEVER commit real secrets
 .env
 .env.local
 .env.development.local
@@ -11,12 +11,17 @@ node_modules/
 backend/.env
 
 # Next.js build output
+.next/
 frontend/.next/
+out/
 frontend/out/
 
-# Build artifacts
+# TypeScript build output
 dist/
 build/
+
+# Prisma generated client
+backend/node_modules/.prisma/
 
 # Debug and Logs
 npm-debug.log*

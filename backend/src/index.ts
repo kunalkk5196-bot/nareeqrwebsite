@@ -23,6 +23,8 @@ import usersRouter from './modules/users/user.controller.js';
 import auditRouter from './modules/audit/audit.controller.js';
 import settingsRouter from './modules/settings/settings.controller.js';
 import { swaggerDocument } from './docs/swagger.js';
+import { checkDatabaseConnection } from './data/prisma.js';
+import { apiLimiter, authLimiter } from './middleware/index.js';
 
 const app = express();
 
@@ -62,6 +64,12 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // API Documentation
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// Rate limiting in production/dev (skipped in unit testing)
+if (process.env.NODE_ENV !== 'test') {
+  app.use('/api/v1/auth/login', authLimiter);
+  app.use('/api/v1', apiLimiter);
+}
 
 // Mount REST API endpoints under /api/v1
 const api = express.Router();
@@ -117,7 +125,7 @@ setInterval(() => {
 
 // Start server
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(config.port, () => {
+  app.listen(config.port, async () => {
     logger.info(`=======================================================`);
     logger.info(`NAREE VENDTRACK - Backend API Server running`);
     logger.info(`Server Port      : http://localhost:${config.port}`);
@@ -126,6 +134,13 @@ if (process.env.NODE_ENV !== 'test') {
     logger.info(`Payment Mode     : ${config.paymentProviderMode.toUpperCase()}`);
     logger.info(`IoT Mode         : ${config.iot.mode.toUpperCase()}`);
     logger.info(`Offline Timeout  : ${config.iot.offlineTimeoutSeconds} seconds`);
+    if (config.mockMode) {
+      logger.warn(`*** MOCK MODE ACTIVE — Using in-memory data store. Data resets on restart. ***`);
+      logger.warn(`*** Set MOCK_MODE=false + DATABASE_URL for production PostgreSQL.          ***`);
+    } else {
+      logger.info(`Database Mode    : PostgreSQL (${config.database.url.split('@').pop()})`);
+      await checkDatabaseConnection();
+    }
     logger.info(`=======================================================`);
   });
 }

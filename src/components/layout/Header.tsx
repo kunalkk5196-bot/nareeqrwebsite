@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Bell, Zap, RefreshCw } from 'lucide-react';
+import { Bell, Zap, RefreshCw, FlaskConical } from 'lucide-react';
 import { api } from '@/lib/api';
+
+const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === 'true';
 
 export function Header({ title }: { title: string }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -163,13 +165,27 @@ export function Header({ title }: { title: string }) {
 
   return (
     <>
-      <header className="h-16 bg-[#0b0f19]/80 backdrop-blur-md border-b border-slate-800/80 fixed top-0 right-0 left-64 z-30 px-6 flex items-center justify-between">
+      {/* MOCK MODE top banner */}
+      {IS_MOCK_MODE && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500/10 border-b border-amber-500/30 text-amber-400 text-xs font-bold flex items-center justify-center gap-2 py-1">
+          <FlaskConical className="w-3.5 h-3.5" />
+          DEMO / MOCK MODE — In-memory data store active. Data resets on server restart.
+        </div>
+      )}
+      <header className={`h-16 bg-[#0b0f19]/80 backdrop-blur-md border-b border-slate-800/80 fixed ${IS_MOCK_MODE ? 'top-7' : 'top-0'} right-0 left-64 z-30 px-6 flex items-center justify-between`}>
         <div className="flex items-center space-x-4">
           <h1 className="text-xl font-bold text-slate-100 tracking-tight">{title}</h1>
-          <div className="hidden md:flex items-center space-x-2 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>IoT Gateway Live</span>
-          </div>
+          {IS_MOCK_MODE ? (
+            <div className="hidden md:flex items-center space-x-2 px-2.5 py-1 rounded-full bg-amber-950/40 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+              <FlaskConical className="w-3 h-3" />
+              <span>Mock Mode</span>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center space-x-2 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>IoT Gateway Live</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-3">
